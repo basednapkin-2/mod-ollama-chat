@@ -70,23 +70,9 @@
     ```
 
 4.  **Configure CMake & Recompile:**
-    You must tell CMake where to find the Eigen library. The recommended method is to use a CMake flag during your build configuration.
 
-    - Navigate to your AzerothCore build directory.
-    - Run CMake with the `EIGEN_INCLUDE_DIR` flag pointing to the root of the extracted Eigen folder.
-
-    ```bash
-    cd /path/to/azerothcore/build
-    cmake .. -DEIGEN_INCLUDE_DIR=/path/to/your/downloads/eigen-5.0.0
-    ```
-
-    - After configuration, build AzerothCore as you normally would:
-    ```bash
-    # For Linux/macOS
-    make -j$(nproc)
-    # For Windows (Visual Studio)
-    cmake --build . --config RelWithDebInfo
-    ```
+    - Seriously if you're reading this you probably already know how to do this. If not, this repo has nothing useful for you.
+    
 
 5.  **Configuration & Restart:**
     - Copy the `mod-ollama-chat.conf.dist` file from the module's directory to your server's `config` folder and rename it to `mod-ollama-chat.conf`.
