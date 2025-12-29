@@ -116,7 +116,7 @@ OllamaChat.SummarizationThreshold = 10
 OllamaChat.SummarizationPromptTemplate = You are a summarization expert. Condense the following conversation between '{bot_name}' and '{player_name}' into a concise, third-person summary of 2-3 sentences. Capture the key topics discussed, any important decisions made, and the overall tone of the relationship. Full Chat History:\n{full_chat_history}
 ```
 
-## Setting up Ollama for the Database
+## Setting up Ollama
 
 This module requires a running Ollama server.
 
