@@ -116,6 +116,15 @@ std::mutex g_ConversationHistoryMutex;
 time_t g_LastHistorySaveTime = 0;
 
 // --------------------------------------------
+// Conversation Summarization
+// --------------------------------------------
+bool        g_EnableSummarization = true;
+uint32_t    g_SummarizationThreshold = 10;
+std::string g_SummarizationPromptTemplate;
+std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>> g_BotConversationSummaries;
+std::mutex  g_ConversationSummaryMutex;
+
+// --------------------------------------------
 // Bot-Player Sentiment Tracking System
 // --------------------------------------------
 bool        g_EnableSentimentTracking = true;
@@ -414,6 +423,10 @@ void LoadOllamaChatConfig()
 
     g_EnableChatHistory               = sConfigMgr->GetOption<bool>("OllamaChat.EnableChatHistory", true);
 
+    g_EnableSummarization = sConfigMgr->GetOption<bool>("OllamaChat.EnableSummarization", true);
+    g_SummarizationThreshold = sConfigMgr->GetOption<uint32_t>("OllamaChat.SummarizationThreshold", 10);
+    g_SummarizationPromptTemplate = sConfigMgr->GetOption<std::string>("OllamaChat.SummarizationPromptTemplate", "You are a summarization expert. Condense the following conversation between '{bot_name}' and '{player_name}' into a concise, third-person summary of 2-3 sentences. Capture the key topics discussed, any important decisions made, and the overall tone of the relationship. Full Chat History:\n{full_chat_history}");
+
     // Bot-Player Sentiment Tracking
     g_EnableSentimentTracking         = sConfigMgr->GetOption<bool>("OllamaChat.EnableSentimentTracking", true);
     g_SentimentDefaultValue           = sConfigMgr->GetOption<float>("OllamaChat.SentimentDefaultValue", 0.5f);
@@ -633,6 +646,38 @@ void LoadBotConversationHistoryFromDB()
 
 }
 
+void LoadChatSummariesFromDB()
+{
+    if (!g_EnableSummarization)
+        return;
+
+    std::lock_guard<std::mutex> lock(g_ConversationSummaryMutex);
+    g_BotConversationSummaries.clear();
+
+    QueryResult result = CharacterDatabase.Query("SELECT bot_guid, player_guid, summary_text FROM mod_ollama_chat_summaries");
+
+    if (!result)
+    {
+        LOG_INFO("server.loading", "[Ollama Chat] No existing conversation summaries found in database");
+        return;
+    }
+
+    uint32_t count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint64_t botGuid = fields[0].Get<uint64_t>();
+        uint64_t playerGuid = fields[1].Get<uint64_t>();
+        std::string summaryText = fields[2].Get<std::string>();
+
+        g_BotConversationSummaries[botGuid][playerGuid] = summaryText;
+        count++;
+
+    } while (result->NextRow());
+
+    LOG_INFO("server.loading", "[Ollama Chat] Loaded {} conversation summaries from database", count);
+}
+
 
 // Definition of the configuration WorldScript.
 OllamaChatConfigWorldScript::OllamaChatConfigWorldScript() : WorldScript("OllamaChatConfigWorldScript") { }
@@ -643,6 +688,7 @@ void OllamaChatConfigWorldScript::OnStartup()
     LoadBotPersonalityList();
     LoadBotConversationHistoryFromDB();
     InitializeSentimentTracking();
+    LoadChatSummariesFromDB();
 
     // Initialize RAG system if enabled
     if (g_EnableRAG) {
