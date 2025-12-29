@@ -2,6 +2,7 @@
 #include "mod-ollama-chat_config.h"
 #include "mod-ollama-chat_sentiment.h"
 #include "mod-ollama-chat_personality.h"
+#include "mod-ollama-chat_rag.h"
 #include "Chat.h"
 #include "Config.h"
 #include "ObjectAccessor.h"
@@ -10,6 +11,30 @@
 #include <fmt/core.h>
 
 using namespace Acore::ChatCommands;
+
+// This new handler is defined as a static function within this file.
+// This allows us to add it without modifying the corresponding header file.
+static bool HandleOllamaReloadRAGCommand(ChatHandler* handler)
+{
+    if (!g_EnableRAG || !g_RAGSystem)
+    {
+        handler->SendSysMessage("OllamaChat: The RAG system is not enabled in the config.");
+        return false;
+    }
+
+    handler->SendSysMessage("OllamaChat: Reloading RAG data...");
+    if (g_RAGSystem->Initialize())
+    {
+        handler->SendSysMessage("OllamaChat: RAG data reloaded successfully.");
+    }
+    else
+    {
+        handler->SendSysMessage("OllamaChat: Failed to reload RAG data. Check worldserver console for errors.");
+    }
+
+    return true;
+}
+
 
 OllamaChatConfigCommand::OllamaChatConfigCommand()
     : CommandScript("OllamaChatConfigCommand")
@@ -32,22 +57,31 @@ ChatCommandTable OllamaChatConfigCommand::GetCommands() const
         { "list", HandleOllamaPersonalityListCommand, SEC_ADMINISTRATOR, Console::Yes }
     };
 
+    // UPDATED: 'reload' is now a sub-command to hold both 'config' and 'rag'
     static ChatCommandTable ollamaReloadCommandTable =
     {
-        { "reload",      HandleOllamaReloadCommand,  SEC_ADMINISTRATOR, Console::Yes },
+        { "config", HandleOllamaReloadConfigCommand, SEC_ADMINISTRATOR, Console::Yes },
+        { "rag",    HandleOllamaReloadRAGCommand,    SEC_ADMINISTRATOR, Console::Yes }
+    };
+
+    // RENAMED for clarity, this is the main command table for '.ollama'
+    static ChatCommandTable ollamaCommandTable =
+    {
+        { "reload",      ollamaReloadCommandTable }, // Points to the new sub-table
         { "sentiment",   ollamaSentimentCommandTable },
         { "personality", ollamaPersonalityCommandTable }
     };
 
     static ChatCommandTable commandTable =
     {
-        { "ollama", ollamaReloadCommandTable }
+        { "ollama", ollamaCommandTable }
     };
 
     return commandTable;
 }
 
-bool OllamaChatConfigCommand::HandleOllamaReloadCommand(ChatHandler* handler)
+// RENAMED: This function now specifically handles reloading the config.
+bool OllamaChatConfigCommand::HandleOllamaReloadConfigCommand(ChatHandler* handler)
 {
     sConfigMgr->Reload();
     LoadOllamaChatConfig();
@@ -63,6 +97,9 @@ bool OllamaChatConfigCommand::HandleOllamaReloadCommand(ChatHandler* handler)
     LoadBotConversationHistoryFromDB();
     InitializeSentimentTracking();
     handler->SendSysMessage("OllamaChat: Configuration reloaded from conf!");
+    
+    // Note: This does NOT reload RAG data automatically.
+    // Use '.ollama reload rag' for that.
     return true;
 }
 

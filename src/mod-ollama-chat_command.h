@@ -10,7 +10,9 @@ public:
     OllamaChatConfigCommand();
     Acore::ChatCommands::ChatCommandTable GetCommands() const override;
 
-    static bool HandleOllamaReloadCommand(ChatHandler* handler);
+    // RENAMED: This function name now matches the implementation in the .cpp file.
+    static bool HandleOllamaReloadConfigCommand(ChatHandler* handler);
+    
     static bool HandleOllamaSentimentViewCommand(ChatHandler* handler, Optional<std::string> botName, Optional<std::string> playerName);
     static bool HandleOllamaSentimentSetCommand(ChatHandler* handler, std::string botName, std::string playerName, float sentimentValue);
     static bool HandleOllamaSentimentResetCommand(ChatHandler* handler, Optional<std::string> botName, Optional<std::string> playerName);
