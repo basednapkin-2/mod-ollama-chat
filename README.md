@@ -1,7 +1,7 @@
 # Enhanced mod-ollama-chat for AzerothCore (WIP)
 
 > [!WARNING]
-> I am not a developer. AI was used to create the code. All I did was spend hours troubleshooting and fixing the AI's bullshit. If for some reason you use this, do NOT use this in ANY production setting unless you go through and review each and every line of code.
+> I am not a developer. AI was used to create the code. All I did was spend hours troubleshooting and fixing the AI's bullshit to make it work with my personal private server. If for some reason you use this, do NOT use this in ANY production setting unless you go through and review each and every line of code.
 > Model used: Gemini 2.5 Pro via Google AI Studio.
 
 > [!CAUTION]
