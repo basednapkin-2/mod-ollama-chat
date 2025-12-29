@@ -1,6 +1,6 @@
 # Enhanced mod-ollama-chat for AzerothCore (WIP)
 
-> [!VERY FUCKING IMPORTANT]
+> [!WARNING]
 > I am not a developer. AI was used to create the code. All I did was spend hours troubleshooting and fixing the AI's bullshit. If for some reason you use this, do NOT use this in ANY production setting unless you go through and review each and every line of code.
 > Model used: Gemini 2.5 Pro via Google AI Studio.
 
@@ -19,13 +19,9 @@
 
 ## Overview
 
-**mod-ollama-chat** is a significantly enhanced fork of the original `mod-ollama-chat` for AzerothCore. While the original module provided a basic bridge to a local Ollama API, this version rebuilds and expands upon that foundation to introduce a suite of advanced intelligence and awareness features. It transforms Player Bots from simple chat responders into dynamic, context-aware members of the game world.
-
-This fork focuses on three core areas of improvement: **deep contextual understanding**, **persistent memory and relationships**, and **server performance and stability**.
+**mod-ollama-chat** is an enhanced fork of the original `mod-ollama-chat` by DustinHendrickson for AzerothCore.
 
 ## Core Enhancements & New Features
-
-This version introduces a host of new systems and significantly upgrades the original module's functionality.
 
 - **Enhanced RAG (Retrieval-Augmented Generation) System**
     - **TF-IDF Vector Search**: A sophisticated C++ search model built with the Eigen library that understands word relevance, providing fast and accurate information retrieval.
