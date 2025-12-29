@@ -112,6 +112,15 @@ extern std::mutex   g_ConversationHistoryMutex;
 extern time_t       g_LastHistorySaveTime;
 
 // --------------------------------------------
+// Conversation Summarization
+// --------------------------------------------
+extern bool        g_EnableSummarization;
+extern uint32_t    g_SummarizationThreshold;
+extern std::string g_SummarizationPromptTemplate;
+extern std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::string>> g_BotConversationSummaries;
+extern std::mutex  g_ConversationSummaryMutex;
+
+// --------------------------------------------
 // Blacklist: Prefixes for Commands (not chat)
 // --------------------------------------------
 extern std::vector<std::string> g_BlacklistCommands;
@@ -264,6 +273,7 @@ void LoadOllamaChatConfig();
 void LoadBotPersonalityList();
 void LoadBotConversationHistoryFromDB();
 void LoadPersonalityTemplatesFromDB();
+void LoadChatSummariesFromDB();
 
 // --------------------------------------------
 // Declaration of the configuration WorldScript.
