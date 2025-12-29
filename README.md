@@ -53,7 +53,7 @@
 ## Installation
 
 1.  **Prerequisites:**
-    - Ensure you have liyunfan1223's AzerothCore (https://github.com/liyunfan1223/azerothcore-wotlk) installation with the Player Bots (https://github.com/liyunfan1223/mod-playerbots) module enabled.
+    - Ensure you have mod-playerbot's AzerothCore (https://github.com/mod-playerbots/azerothcore-wotlk) installation with the Player Bots (https://github.com/mod-playerbots/mod-playerbots) module enabled.
     - The module depends on:
      - **fmtlib** (https://github.com/fmtlib/fmt) - For string formatting
      - **nlohmann/json** (https://github.com/nlohmann/json) - For JSON processing (**bundled with module** - no installation needed)
