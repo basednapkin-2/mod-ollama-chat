@@ -3,62 +3,91 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <unordered_map>
-#include <nlohmann/json.hpp>
 
+// Include Eigen for sparse vector operations.
+// Use the main <Eigen/Sparse> header for compatibility and completeness.
+#include <Eigen/Sparse>
+
+// Represents a key-value pair for the 'metadata' field.
+struct RAGMetadata {
+    std::string key;
+    std::string value;
+};
+
+// Represents a link to another entity in the knowledge graph.
+struct RAGRelation {
+    std::string id;
+    std::string type;
+    std::string relationship;
+};
+
+// Represents the source of the information.
+struct RAGSource {
+    std::string url;
+    std::string commentId; // Optional
+};
+
+// Represents a single entry in our RAG knowledge base.
 struct RAGEntry {
+    // Basic Schema Fields
     std::string id;
     std::string title;
     std::string content;
     std::vector<std::string> keywords;
     std::vector<std::string> tags;
+    // Advanced Schema Fields
+    std::string parentId;
+    std::string summary;
+    std::string entityType;
+    std::vector<std::string> questions;
+    std::vector<RAGMetadata> metadata;
+    std::vector<RAGRelation> relations;
+    RAGSource source;
 };
 
+// Represents a query result with its similarity score.
 struct RAGResult {
     const RAGEntry* entry;
     float similarity;
+
+    bool operator<(const RAGResult& other) const {
+        return similarity < other.similarity;
+    }
 };
 
-class OllamaRAGSystem {
+class Player; // Forward declaration
+
+class OllamaRAGSystem
+{
 public:
     OllamaRAGSystem();
     ~OllamaRAGSystem();
 
-    // Initialize the RAG system by loading JSON data files
     bool Initialize();
 
-    // Retrieve relevant information based on a query
-    std::vector<RAGResult> RetrieveRelevantInfo(const std::string& query, uint32_t maxResults = 3, float similarityThreshold = 0.3f);
-
-    // Get formatted RAG information for prompt inclusion
+    // Type alias for the new filter map.
+    using RAGFilterMap = std::unordered_map<std::string, std::string>;
+    
+    // UPDATED: Now accepts a filter map for hybrid search.
+    std::vector<RAGResult> RetrieveRelevantInfo(const std::string& query, const RAGFilterMap& filters, int maxResults, float similarityThreshold);
+    
     std::string GetFormattedRAGInfo(const std::vector<RAGResult>& results);
 
 private:
-    // Load RAG data from JSON files in the specified directory
-    bool LoadRAGDataFromDirectory(const std::string& directoryPath);
+    bool LoadRAGEntriesFromFile(const std::string& filePath);
+    std::vector<std::string> TokenizeString(const std::string& text) const;
+    bool DoesEntryMatchFilters(const RAGEntry& entry, const RAGFilterMap& filters) const;
+    void BuildTFIDFVectors();
 
-    // Load a single JSON file
-    bool LoadRAGDataFromFile(const std::string& filePath);
+    std::vector<RAGEntry> _ragEntries;
+    bool _isInitialized;
 
-    // Calculate similarity between query and entry
-    float CalculateSimilarity(const std::string& query, const RAGEntry& entry);
-
-    // Simple text preprocessing (lowercase, remove punctuation)
-    std::string PreprocessText(const std::string& text) const;
-
-    // Split text into words
-    std::vector<std::string> TokenizeText(const std::string& text) const;
-
-    // Calculate cosine similarity between two vectors
-    float CalculateCosineSimilarity(const std::vector<float>& vec1, const std::vector<float>& vec2) const;
-
-    // Convert text to simple TF vector (term frequency)
-    std::vector<float> TextToTFVector(const std::string& text, const std::vector<std::string>& vocabulary) const;
-
-private:
-    std::vector<RAGEntry> m_ragEntries;
-    std::vector<std::string> m_vocabulary;
-    bool m_initialized;
+    // --- TF-IDF Data Structures ---
+    std::unordered_map<std::string, int> _vocabulary;
+    std::vector<double> _idf_vector;
+    std::vector<Eigen::SparseVector<double>> _document_vectors;
 };
 
 #endif // MOD_OLLAMA_CHAT_RAG_H
