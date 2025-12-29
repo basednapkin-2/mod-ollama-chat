@@ -73,7 +73,7 @@
 3.  **Clone the Module:**
     ```bash
     cd /path/to/azerothcore/modules
-    git clone https://github.com/[YourGitHub]/napkin-mod-ollama-chat.git mod-ollama-chat
+    git clone https://github.com/basednapkin-2/mod-ollama-chat mod-ollama-chat
     ```
 
 4.  **Configure CMake & Recompile:**
