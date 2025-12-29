@@ -27,7 +27,7 @@
     - **TF-IDF Vector Search**: A sophisticated C++ search model built with the Eigen library that understands word relevance, providing fast and accurate information retrieval.
     - **Hybrid Search**: Automatically parses player queries for keywords (e.g., "frost resist", "mail") to apply metadata filters, improving search accuracy.
     - **Advanced Schema Integration**: The C++ module was overhauled for an advanced .json schema. Added 'summary', 'entityType', and 'vectors' members to hold 'metadata' and 'relations' objects.
-        -   The `metadata` field is used by the Hybrid Search system to pre-filter documents based on structured data (e.g., `type: Mail`, `resistance: Frost`) before performing the text search, drastically improving accuracy.
+        -   The `metadata` field is used by the Hybrid Search system to pre-filter documents based on structured data (e.g., `type: Mail`, `resistance: Frost`) before performing the text search.
         -   The `summary`, `questions`, and `keywords` fields are all indexed by the TF-IDF Vector Search model, creating a more contextually aware search index.
         -   The `relations` field provides the LLM with explicit links between game entities (e.g., "this item drops from that boss"), allowing it to form more comprehensive and connected answers.
 
