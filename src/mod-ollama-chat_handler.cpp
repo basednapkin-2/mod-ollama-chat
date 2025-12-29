@@ -52,6 +52,7 @@
 static bool IsBotEligibleForChatChannelLocal(Player* bot, Player* player,
                                              ChatChannelSourceLocal source, Channel* channel = nullptr, Player* receiver = nullptr);
 static std::string GenerateBotPrompt(Player* bot, std::string playerMessage, Player* player);
+static void TriggerConversationSummary(uint64_t botGuid, uint64_t playerGuid, const std::deque<std::pair<std::string, std::string>>& historyToSummarize);
 
 // Helper function to format class name for any player
 static std::string FormatPlayerClass(uint8_t classId)
@@ -257,17 +258,83 @@ void PlayerBotChatHandler::OnPlayerChat(Player* player, uint32_t type, uint32_t 
     ProcessChat(player, type, lang, msg, sourceLocal, nullptr, receiver);
 }
 
-void AppendBotConversation(uint64_t botGuid, uint64_t playerGuid, const std::string& playerMessage, const std::string& botReply)
+static void TriggerConversationSummary(uint64_t botGuid, uint64_t playerGuid, const std::deque<std::pair<std::string, std::string>>& historyToSummarize)
 {
-    std::lock_guard<std::mutex> lock(g_ConversationHistoryMutex);
-    auto& playerHistory = g_BotConversationHistory[botGuid][playerGuid];
-    playerHistory.push_back({ playerMessage, botReply });
-    while (playerHistory.size() > g_MaxConversationHistory)
-    {
-        playerHistory.pop_front();
+    // This function runs in a new thread to avoid blocking.
+    Player* bot = ObjectAccessor::FindPlayer(ObjectGuid(botGuid));
+    Player* player = ObjectAccessor::FindPlayer(ObjectGuid(playerGuid));
+    if (!bot || !player) return;
+
+    // 1. Build the full chat history string from the provided copy.
+    std::string fullChatHistory;
+    for (const auto& entry : historyToSummarize) {
+        fullChatHistory += player->GetName() + ": " + entry.first + "\n";
+        fullChatHistory += bot->GetName() + ": " + entry.second + "\n";
     }
 
+    // 2. Format the summarization prompt.
+    std::string prompt = SafeFormat(
+        g_SummarizationPromptTemplate,
+        fmt::arg("bot_name", bot->GetName()),
+        fmt::arg("player_name", player->GetName()),
+        fmt::arg("full_chat_history", fullChatHistory)
+    );
+
+    // 3. Query the LLM for the summary.
+    std::string summary = QueryOllamaAPI(prompt);
+    if (summary.empty() || summary.find("Error") != std::string::npos) {
+        LOG_ERROR("server.loading", "[Ollama Chat] Failed to generate summary for bot {} and player {}. Raw history was cleared.", botGuid, playerGuid);
+        return;
+    }
+
+    // 4. Update the in-memory summary cache.
+    {
+        std::lock_guard<std::mutex> lock(g_ConversationSummaryMutex);
+        g_BotConversationSummaries[botGuid][playerGuid] = summary;
+    }
+
+    // 5. Save the new summary to the database.
+    std::string escSummary = summary;
+    CharacterDatabase.EscapeString(escSummary);
+    CharacterDatabase.Execute(SafeFormat(
+        "REPLACE INTO mod_ollama_chat_summaries (bot_guid, player_guid, summary_text) VALUES ({}, {}, '{}')",
+        botGuid, playerGuid, escSummary
+    ));
+
+    if (g_DebugEnabled) {
+        LOG_INFO("server.loading", "[Ollama Chat] Conversation summary generated and saved for bot {} and player {}", botGuid, playerGuid);
+    }
 }
+
+void AppendBotConversation(uint64_t botGuid, uint64_t playerGuid, const std::string& playerMessage, const std::string& botReply)
+{
+    std::deque<std::pair<std::string, std::string>> historyToSummarize;
+    bool shouldSummarize = false;
+
+    {
+        std::lock_guard<std::mutex> lock(g_ConversationHistoryMutex);
+        auto& playerHistory = g_BotConversationHistory[botGuid][playerGuid];
+        playerHistory.push_back({ playerMessage, botReply });
+        while (playerHistory.size() > g_MaxConversationHistory)
+        {
+            playerHistory.pop_front();
+        }
+
+        if (g_EnableSummarization && playerHistory.size() >= g_SummarizationThreshold)
+        {
+            shouldSummarize = true;
+            historyToSummarize = playerHistory; // Make a copy of the history to be summarized.
+            playerHistory.clear(); // Immediately clear the history to prevent re-triggering and to start fresh.
+        }
+    }
+
+    if (shouldSummarize)
+    {
+        // Detach a thread to handle the summarization process asynchronously.
+        std::thread(TriggerConversationSummary, botGuid, playerGuid, historyToSummarize).detach();
+    }
+}
+
 
 void SaveBotConversationHistoryToDB()
 {
@@ -324,27 +391,55 @@ std::string GetBotHistoryPrompt(uint64_t botGuid, uint64_t playerGuid, std::stri
         return "";
     }
     
-    std::lock_guard<std::mutex> lock(g_ConversationHistoryMutex);
+    std::string summary;
+    if (g_EnableSummarization)
+    {
+        std::lock_guard<std::mutex> lock(g_ConversationSummaryMutex);
+        const auto botIt = g_BotConversationSummaries.find(botGuid);
+        if (botIt != g_BotConversationSummaries.end()) {
+            const auto playerIt = botIt->second.find(playerGuid);
+            if (playerIt != botIt->second.end()) {
+                summary = playerIt->second;
+            }
+        }
+    }
 
-    std::string result;
-    const auto botIt = g_BotConversationHistory.find(botGuid);
-    if (botIt == g_BotConversationHistory.end())
-        return result;
-    const auto playerIt = botIt->second.find(playerGuid);
-    if (playerIt == botIt->second.end())
-        return result;
+    std::deque<std::pair<std::string, std::string>> recentHistory;
+    {
+        std::lock_guard<std::mutex> lock(g_ConversationHistoryMutex);
+        const auto botIt = g_BotConversationHistory.find(botGuid);
+        if (botIt != g_BotConversationHistory.end()) {
+            const auto playerIt = botIt->second.find(playerGuid);
+            if (playerIt != botIt->second.end()) {
+                recentHistory = playerIt->second;
+            }
+        }
+    }
+    
+    // If no history at all, just return empty.
+    if (summary.empty() && recentHistory.empty()) {
+        return "";
+    }
 
     Player* player = ObjectAccessor::FindPlayer(ObjectGuid(playerGuid));
     std::string playerName = player ? player->GetName() : "The player";
 
+    std::string result;
     result += SafeFormat(g_ChatHistoryHeaderTemplate, fmt::arg("player_name", playerName));
+    
+    if (!summary.empty()) {
+        result += "Summary of past conversation: " + summary + "\n\n";
+    }
 
-    for (const auto& entry : playerIt->second) {
-        result += SafeFormat(g_ChatHistoryLineTemplate,
-            fmt::arg("player_name", playerName),
-            fmt::arg("player_message", entry.first),
-            fmt::arg("bot_reply", entry.second)
-        );
+    if (!recentHistory.empty()) {
+        result += "Most recent messages:\n";
+        for (const auto& entry : recentHistory) {
+            result += SafeFormat(g_ChatHistoryLineTemplate,
+                fmt::arg("player_name", playerName),
+                fmt::arg("player_message", entry.first),
+                fmt::arg("bot_reply", entry.second)
+            );
+        }
     }
 
     result += SafeFormat(g_ChatHistoryFooterTemplate,
@@ -1395,18 +1490,47 @@ std::string GenerateBotPrompt(Player* bot, std::string playerMessage, Player* pl
     // Retrieve RAG information if enabled
     std::string ragInfo;
     if (g_EnableRAG && g_RAGSystem) {
-        auto ragResults = g_RAGSystem->RetrieveRelevantInfo(playerMessage, g_RAGMaxRetrievedItems, g_RAGSimilarityThreshold);
+        std::string ragQuery = playerMessage;
+        OllamaRAGSystem::RAGFilterMap filters;
+
+        // --- HYBRID SEARCH: PARSE FILTERS FROM MESSAGE ---
+        const std::map<std::string, std::pair<std::string, std::string>> filterKeywords = {
+            {"mail",       {"type", "Mail"}},
+            {"leather",    {"type", "Leather"}},
+            {"cloth",      {"type", "Cloth"}},
+            {"plate",      {"type", "Plate"}},
+            {"frost",      {"resistance", "Frost"}},
+            {"fire",       {"resistance", "Fire"}},
+            {"arcane",     {"resistance", "Arcane"}},
+            {"shadow",     {"resistance", "Shadow"}},
+            {"nature",     {"resistance", "Nature"}},
+        };
+
+        std::string lowerQuery = ragQuery;
+        std::transform(lowerQuery.begin(), lowerQuery.end(), lowerQuery.begin(), ::tolower);
+
+        for (const auto& pair : filterKeywords) {
+            size_t pos = lowerQuery.find(pair.first);
+            if (pos != std::string::npos) {
+                filters[pair.second.first] = pair.second.second;
+                // Simple removal of the keyword from query
+                ragQuery.erase(pos, pair.first.length());
+            }
+        }
+        
+        if (g_DebugEnabled && !filters.empty()) {
+            std::stringstream filter_ss;
+            for(const auto& f : filters) {
+                filter_ss << " {" << f.first << ": " << f.second << "}";
+            }
+            LOG_DEBUG("server.loading", "[Ollama RAG] Hybrid Search: Parsed filters:{} | Cleaned query: '{}'", filter_ss.str(), ragQuery);
+        }
+
+        auto ragResults = g_RAGSystem->RetrieveRelevantInfo(ragQuery, filters, g_RAGMaxRetrievedItems, g_RAGSimilarityThreshold);
         std::string ragContent = g_RAGSystem->GetFormattedRAGInfo(ragResults);
         if (!ragContent.empty()) {
             ragInfo = SafeFormat(g_RAGPromptTemplate, fmt::arg("rag_info", ragContent));
         }
-        if (g_DebugEnabled) {
-            LOG_INFO("server.loading", "[Ollama Chat] RAG Debug - Enabled: {}, System: {}, Message: '{}', Results: {}, Content length: {}",
-                g_EnableRAG, (void*)g_RAGSystem, playerMessage, ragResults.size(), ragContent.length());
-        }
-    } else if (g_DebugEnabled) {
-        LOG_INFO("server.loading", "[Ollama Chat] RAG Debug - Not enabled or no system - Enabled: {}, System: {}",
-            g_EnableRAG, (void*)g_RAGSystem);
     }
 
     std::string extraInfo = SafeFormat(
