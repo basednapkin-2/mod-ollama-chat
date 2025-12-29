@@ -33,6 +33,9 @@
 
 ## Comparison to the Original mod-ollama-chat
 
+> [!WARNING]
+> This is what Gemini claims. I have no idea if this is true as this is completely overkill and I don't think any one hosting a single player WoW server would ever have a large enough RAG knowledge base to see a difference.
+
 **Performance Gains:**
 - **Query Latency**: 95-99% reduction in latency. In-game queries are virtually instantaneous (less than 10ms) compared to the original's (100-500ms+).
 - **CPU Load**: 90-95% reduction in CPU spikes. All computations are done once during worldserver startup. Player queries are now computationally cheap, preventing server lag (TPS drops) when bots need to "think".
