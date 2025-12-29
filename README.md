@@ -84,7 +84,7 @@
 5.  **Configuration & Restart:**
     - Copy the `mod-ollama-chat.conf.dist` file from the module's directory to your server's `config` folder and rename it to `mod-ollama-chat.conf`.
     - Edit the `.conf` file to match your setup, especially the Ollama API endpoint and RAG data path.
-      - **ADD THE CONVERSATION SUMMARIZATION SECTION BELOW TO YOUR CONF FILE, DON'T SET ENABLESUMMARIZATION TO TRUE UNTIL YOU HAVE RAN THE SQL SCRIPT FOR IT **
+      - **ADD THE CONVERSATION SUMMARIZATION SECTION BELOW TO YOUR CONF FILE, DON'T SET ENABLESUMMARIZATION TO TRUE UNTIL YOU HAVE LET AZEROTHCORE AUTO-IMPORT THE SQL DURING WORLDSERVER STARTUP**
     - Restart your `worldserver`.
 
 ```# --------------------------------------------
