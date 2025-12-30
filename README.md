@@ -72,13 +72,14 @@
 
 3.  **Clone the Module:**
     ```bash
-    cd /path/to/azerothcore/modules
+    cd /path/to/azerothcorebuild/modules
     git clone https://github.com/basednapkin-2/mod-ollama-chat mod-ollama-chat
     ```
 
 4.  **Configure CMake & Recompile:**
 
-    - Seriously if you're reading this you probably already know how to do this. If not, this repo has nothing useful for you.
+    - Move CMakeLists.txt to /path/to/azerothcorebuild/modules (Should not be in your mod-ollama-chat folder). This is an edited version of the original mod-playerbots AzerothCore CMakeLists to load Eigen's deps.
+    - Seriously if you're reading this you probably already know how to configure and recompile. If not, this repo has nothing useful for you.
     
 
 5.  **Configuration & Restart:**
